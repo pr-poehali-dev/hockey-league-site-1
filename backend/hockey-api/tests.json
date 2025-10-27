@@ -1,0 +1,40 @@
+{
+  "tests": [
+    {
+      "name": "Get standings",
+      "method": "GET",
+      "path": "/?action=standings",
+      "expectedStatus": 200,
+      "expectedBody": [
+        {
+          "id": "number",
+          "name": "string",
+          "games": "number",
+          "wins": "number",
+          "losses": "number",
+          "points": "number",
+          "goalsFor": "number",
+          "goalsAgainst": "number"
+        }
+      ],
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get matches",
+      "method": "GET",
+      "path": "/?action=matches",
+      "expectedStatus": 200,
+      "expectedBody": [
+        {
+          "id": "number",
+          "date": "string",
+          "time": "string",
+          "homeTeam": "string",
+          "awayTeam": "string",
+          "status": "string"
+        }
+      ],
+      "bodyMatcher": "partial"
+    }
+  ]
+}

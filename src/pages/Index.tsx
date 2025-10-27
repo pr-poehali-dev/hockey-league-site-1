@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Icon from '@/components/ui/icon';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
 
 interface Team {
   id: number;
@@ -27,27 +30,73 @@ interface Match {
   twitchChannel?: string;
 }
 
-const teams: Team[] = [
-  { id: 1, name: 'Северные Волки', games: 12, wins: 10, losses: 2, points: 30, goalsFor: 45, goalsAgainst: 18 },
-  { id: 2, name: 'Стальные Акулы', games: 12, wins: 9, losses: 3, points: 27, goalsFor: 42, goalsAgainst: 22 },
-  { id: 3, name: 'Огненные Драконы', games: 12, wins: 8, losses: 4, points: 24, goalsFor: 38, goalsAgainst: 25 },
-  { id: 4, name: 'Ледяные Медведи', games: 12, wins: 7, losses: 5, points: 21, goalsFor: 35, goalsAgainst: 28 },
-  { id: 5, name: 'Грозовые Быки', games: 12, wins: 6, losses: 6, points: 18, goalsFor: 32, goalsAgainst: 32 },
-  { id: 6, name: 'Молнии', games: 12, wins: 5, losses: 7, points: 15, goalsFor: 28, goalsAgainst: 35 },
-  { id: 7, name: 'Северное Сияние', games: 12, wins: 3, losses: 9, points: 9, goalsFor: 22, goalsAgainst: 40 },
-  { id: 8, name: 'Метеоры', games: 12, wins: 2, losses: 10, points: 6, goalsFor: 18, goalsAgainst: 45 },
-];
-
-const matches: Match[] = [
-  { id: 1, date: '2025-10-28', time: '19:00', homeTeam: 'Северные Волки', awayTeam: 'Огненные Драконы', status: 'upcoming', twitchChannel: 'phl_official' },
-  { id: 2, date: '2025-10-28', time: '21:00', homeTeam: 'Стальные Акулы', awayTeam: 'Ледяные Медведи', status: 'upcoming', twitchChannel: 'phl_official' },
-  { id: 3, date: '2025-10-27', time: '19:00', homeTeam: 'Грозовые Быки', awayTeam: 'Молнии', status: 'live', score: '2:1', twitchChannel: 'phl_official' },
-  { id: 4, date: '2025-10-26', time: '19:00', homeTeam: 'Метеоры', awayTeam: 'Северное Сияние', status: 'finished', score: '3:4' },
-  { id: 5, date: '2025-10-26', time: '21:00', homeTeam: 'Северные Волки', awayTeam: 'Стальные Акулы', status: 'finished', score: '4:2' },
-];
+const API_URL = 'https://functions.poehali.dev/18c1e5bb-7fa9-480e-9319-1cf2abd34511';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('table');
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingMatch, setEditingMatch] = useState<number | null>(null);
+  const [editScores, setEditScores] = useState<{home: string, away: string}>({home: '', away: ''});
+  const { toast } = useToast();
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [teamsRes, matchesRes] = await Promise.all([
+        fetch(`${API_URL}?action=standings`),
+        fetch(`${API_URL}?action=matches`)
+      ]);
+      
+      const teamsData = await teamsRes.json();
+      const matchesData = await matchesRes.json();
+      
+      setTeams(teamsData);
+      setMatches(matchesData);
+    } catch (error) {
+      toast({
+        title: "Ошибка загрузки",
+        description: "Не удалось загрузить данные",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateMatchScore = async (matchId: number, homeScore: number, awayScore: number) => {
+    try {
+      const response = await fetch(API_URL, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          matchId,
+          homeScore,
+          awayScore,
+          status: 'finished'
+        })
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Успешно!",
+          description: "Счёт матча обновлён"
+        });
+        await loadData();
+        setEditingMatch(null);
+      }
+    } catch (error) {
+      toast({
+        title: "Ошибка",
+        description: "Не удалось обновить счёт",
+        variant: "destructive"
+      });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#2d1810] via-[#3d2418] to-[#2d1810]">
@@ -108,39 +157,43 @@ const Index = () => {
                 Турнирная таблица
               </h2>
               
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left py-3 px-2 font-oswald text-muted-foreground">#</th>
-                      <th className="text-left py-3 px-4 font-oswald text-muted-foreground">Команда</th>
-                      <th className="text-center py-3 px-2 font-oswald text-muted-foreground">И</th>
-                      <th className="text-center py-3 px-2 font-oswald text-muted-foreground">В</th>
-                      <th className="text-center py-3 px-2 font-oswald text-muted-foreground">П</th>
-                      <th className="text-center py-3 px-2 font-oswald text-muted-foreground">Ш</th>
-                      <th className="text-center py-3 px-2 font-oswald text-muted-foreground">ПШ</th>
-                      <th className="text-center py-3 px-2 font-oswald text-muted-foreground font-bold text-primary">О</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {teams.map((team, index) => (
-                      <tr 
-                        key={team.id} 
-                        className="border-b border-border/50 hover:bg-secondary/30 transition-colors duration-200"
-                      >
-                        <td className="py-3 px-2 font-bold text-muted-foreground">{index + 1}</td>
-                        <td className="py-3 px-4 font-semibold text-foreground">{team.name}</td>
-                        <td className="text-center py-3 px-2 text-muted-foreground">{team.games}</td>
-                        <td className="text-center py-3 px-2 text-green-400">{team.wins}</td>
-                        <td className="text-center py-3 px-2 text-red-400">{team.losses}</td>
-                        <td className="text-center py-3 px-2 text-muted-foreground">{team.goalsFor}</td>
-                        <td className="text-center py-3 px-2 text-muted-foreground">{team.goalsAgainst}</td>
-                        <td className="text-center py-3 px-2 font-bold text-primary text-lg">{team.points}</td>
+              {loading ? (
+                <div className="text-center py-8 text-muted-foreground">Загрузка...</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-3 px-2 font-oswald text-muted-foreground">#</th>
+                        <th className="text-left py-3 px-4 font-oswald text-muted-foreground">Команда</th>
+                        <th className="text-center py-3 px-2 font-oswald text-muted-foreground">И</th>
+                        <th className="text-center py-3 px-2 font-oswald text-muted-foreground">В</th>
+                        <th className="text-center py-3 px-2 font-oswald text-muted-foreground">П</th>
+                        <th className="text-center py-3 px-2 font-oswald text-muted-foreground">Ш</th>
+                        <th className="text-center py-3 px-2 font-oswald text-muted-foreground">ПШ</th>
+                        <th className="text-center py-3 px-2 font-oswald text-muted-foreground font-bold text-primary">О</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {teams.map((team, index) => (
+                        <tr 
+                          key={team.id} 
+                          className="border-b border-border/50 hover:bg-secondary/30 transition-colors duration-200"
+                        >
+                          <td className="py-3 px-2 font-bold text-muted-foreground">{index + 1}</td>
+                          <td className="py-3 px-4 font-semibold text-foreground">{team.name}</td>
+                          <td className="text-center py-3 px-2 text-muted-foreground">{team.games}</td>
+                          <td className="text-center py-3 px-2 text-green-400">{team.wins}</td>
+                          <td className="text-center py-3 px-2 text-red-400">{team.losses}</td>
+                          <td className="text-center py-3 px-2 text-muted-foreground">{team.goalsFor}</td>
+                          <td className="text-center py-3 px-2 text-muted-foreground">{team.goalsAgainst}</td>
+                          <td className="text-center py-3 px-2 font-bold text-primary text-lg">{team.points}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </Card>
           </TabsContent>
 
@@ -152,63 +205,116 @@ const Index = () => {
               </h2>
               
               <div className="space-y-4">
-                {matches.map((match) => (
-                  <Card 
-                    key={match.id} 
-                    className={`p-4 transition-all duration-300 hover:scale-[1.02] ${
-                      match.status === 'live' ? 'border-red-500 border-2 shadow-lg shadow-red-500/20' : 'border-border'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between flex-wrap gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="text-center min-w-[80px]">
-                          <div className="text-xs text-muted-foreground">{match.date}</div>
-                          <div className="text-lg font-bold text-primary font-oswald">{match.time}</div>
+                {loading ? (
+                  <div className="text-center py-8 text-muted-foreground">Загрузка...</div>
+                ) : (
+                  matches.map((match) => (
+                    <Card 
+                      key={match.id} 
+                      className={`p-4 transition-all duration-300 ${
+                        match.status === 'live' ? 'border-red-500 border-2 shadow-lg shadow-red-500/20' : 'border-border'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between flex-wrap gap-4">
+                        <div className="flex items-center gap-4">
+                          <div className="text-center min-w-[80px]">
+                            <div className="text-xs text-muted-foreground">{match.date}</div>
+                            <div className="text-lg font-bold text-primary font-oswald">{match.time}</div>
+                          </div>
+                          
+                          <div className="flex items-center gap-3">
+                            <span className="font-semibold text-foreground min-w-[120px] sm:min-w-[150px] text-right">{match.homeTeam}</span>
+                            <span className="text-muted-foreground font-bold">VS</span>
+                            <span className="font-semibold text-foreground min-w-[120px] sm:min-w-[150px]">{match.awayTeam}</span>
+                          </div>
                         </div>
-                        
-                        <div className="flex items-center gap-3">
-                          <span className="font-semibold text-foreground min-w-[120px] sm:min-w-[150px] text-right">{match.homeTeam}</span>
-                          <span className="text-muted-foreground font-bold">VS</span>
-                          <span className="font-semibold text-foreground min-w-[120px] sm:min-w-[150px]">{match.awayTeam}</span>
-                        </div>
-                      </div>
 
-                      <div className="flex items-center gap-3">
-                        {match.status === 'live' && (
-                          <>
-                            <Badge className="bg-red-500 text-white animate-pulse">
-                              <Icon name="Radio" size={14} className="mr-1" />
-                              LIVE
-                            </Badge>
-                            {match.score && (
-                              <span className="text-xl font-bold text-primary font-oswald">{match.score}</span>
-                            )}
-                            {match.twitchChannel && (
+                        <div className="flex items-center gap-3">
+                          {editingMatch === match.id ? (
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                placeholder="Дом"
+                                value={editScores.home}
+                                onChange={(e) => setEditScores({...editScores, home: e.target.value})}
+                                className="w-16 h-8 text-center"
+                              />
+                              <span>:</span>
+                              <Input
+                                type="number"
+                                placeholder="Гост"
+                                value={editScores.away}
+                                onChange={(e) => setEditScores({...editScores, away: e.target.value})}
+                                className="w-16 h-8 text-center"
+                              />
                               <Button 
                                 size="sm" 
-                                className="bg-purple-600 hover:bg-purple-700"
-                                onClick={() => window.open(`https://twitch.tv/${match.twitchChannel}`, '_blank')}
+                                onClick={() => updateMatchScore(match.id, parseInt(editScores.home), parseInt(editScores.away))}
+                                disabled={!editScores.home || !editScores.away}
                               >
-                                <Icon name="Video" size={16} className="mr-2" />
-                                Смотреть
+                                <Icon name="Check" size={16} />
                               </Button>
-                            )}
-                          </>
-                        )}
-                        
-                        {match.status === 'finished' && match.score && (
-                          <span className="text-lg font-bold text-muted-foreground font-oswald">{match.score}</span>
-                        )}
-                        
-                        {match.status === 'upcoming' && (
-                          <Badge variant="outline" className="border-primary text-primary">
-                            Скоро
-                          </Badge>
-                        )}
+                              <Button 
+                                size="sm" 
+                                variant="ghost"
+                                onClick={() => setEditingMatch(null)}
+                              >
+                                <Icon name="X" size={16} />
+                              </Button>
+                            </div>
+                          ) : (
+                            <>
+                              {match.status === 'live' && (
+                                <>
+                                  <Badge className="bg-red-500 text-white animate-pulse">
+                                    <Icon name="Radio" size={14} className="mr-1" />
+                                    LIVE
+                                  </Badge>
+                                  {match.score && (
+                                    <span className="text-xl font-bold text-primary font-oswald">{match.score}</span>
+                                  )}
+                                  {match.twitchChannel && (
+                                    <Button 
+                                      size="sm" 
+                                      className="bg-purple-600 hover:bg-purple-700"
+                                      onClick={() => window.open(`https://twitch.tv/${match.twitchChannel}`, '_blank')}
+                                    >
+                                      <Icon name="Video" size={16} className="mr-2" />
+                                      Смотреть
+                                    </Button>
+                                  )}
+                                </>
+                              )}
+                              
+                              {match.status === 'finished' && match.score && (
+                                <span className="text-lg font-bold text-muted-foreground font-oswald">{match.score}</span>
+                              )}
+                              
+                              {match.status === 'upcoming' && (
+                                <>
+                                  <Badge variant="outline" className="border-primary text-primary">
+                                    Скоро
+                                  </Badge>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => {
+                                      setEditingMatch(match.id);
+                                      setEditScores({home: '', away: ''});
+                                    }}
+                                  >
+                                    <Icon name="Edit" size={16} className="mr-2" />
+                                    Внести счёт
+                                  </Button>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </Card>
-                ))}
+                    </Card>
+                  ))
+                )}
               </div>
             </Card>
           </TabsContent>
