@@ -129,9 +129,8 @@ export default function Admin() {
 
   const handleSaveMatch = async () => {
     try {
-      const url = editingMatch 
-        ? `${API_BASE}/admin/matches/${editingMatch.id}`
-        : `${API_BASE}/admin/matches`;
+      const pathParam = editingMatch ? `matches/${editingMatch.id}` : 'matches';
+      const url = `${API_BASE}?path=${pathParam}`;
       
       const method = editingMatch ? 'PUT' : 'POST';
       
@@ -154,7 +153,7 @@ export default function Admin() {
     if (!confirm('Удалить матч?')) return;
     
     try {
-      await fetch(`${API_BASE}/admin/matches/${id}`, { method: 'DELETE' });
+      await fetch(`${API_BASE}?path=matches/${id}`, { method: 'DELETE' });
       await loadData();
     } catch (error) {
       console.error('Ошибка удаления матча:', error);
@@ -163,7 +162,7 @@ export default function Admin() {
 
   const handleChangeMatchStatus = async (id: number, status: string) => {
     try {
-      await fetch(`${API_BASE}/admin/matches/${id}/status`, {
+      await fetch(`${API_BASE}?path=matches/${id}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
