@@ -55,14 +55,17 @@ const Index = () => {
       const teamsData = await teamsRes.json();
       const matchesData = await matchesRes.json();
       
-      setTeams(teamsData);
-      setMatches(matchesData);
+      setTeams(Array.isArray(teamsData) ? teamsData : []);
+      setMatches(Array.isArray(matchesData) ? matchesData : []);
     } catch (error) {
+      console.error('Ошибка загрузки:', error);
       toast({
         title: "Ошибка загрузки",
         description: "Не удалось загрузить данные",
         variant: "destructive"
       });
+      setTeams([]);
+      setMatches([]);
     } finally {
       setLoading(false);
     }
